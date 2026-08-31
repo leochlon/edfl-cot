@@ -1,0 +1,4 @@
+# The accounting (edfl_cot.core) is stdlib-only.
+# The gate needs an HTTP client for whichever backend you use.
+openai>=1.0                 # edfl_cot.backends.openai_backend
+# httpx                     # only for backends.gemini_backend / backends.vertex_backend

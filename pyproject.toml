@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edfl-cot"
+version = "14.1.0"
+description = "Answer or abstain on whether evidence and reasoning moved the model's belief"
+requires-python = ">=3.9"
+dependencies = ["openai>=1.0"]
+
+[project.optional-dependencies]
+gemini = ["httpx"]
+vertex = ["httpx"]
+
+[tool.setuptools.packages.find]
+include = ["edfl_cot*"]
