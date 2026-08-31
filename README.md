@@ -11,6 +11,19 @@ pip install -e .            # or: pip install -r requirements.txt
 export OPENAI_API_KEY=...   # plus OPENAI_BASE_URL if you route through a proxy
 ```
 
+Three paths, ascending in cost. Take the cheapest one that answers your question.
+
+| path | returns | calls | what it gives you |
+|---|---|---|---|
+| `abstain_fast` | `AbstainResult` | **8-64** | refuse, without touching a null |
+| `localise_steps` | `PrefixLadder` | **N+1** | which step moved the belief |
+| `score_cot_budget` | `CotBudgetResult` | **720** | the only certificate |
+
+`N` is the number of reasoning steps. The certificate cannot be made cheap: answering
+reduces to `b_lo >= p*`, and `conf_lower` needs about 80 draws to reach 0.95 even
+when every draw is exactly 1.0, so the floor is the bound and not the probe. Run
+`abstain_fast` first and escalate only on `needs_anchor`.
+
 ```python
 from edfl_cot import score_cot_budget, CellSpec, BatteryConfig
 
@@ -89,11 +102,53 @@ edfl_cot/backends/         openai / gemini / vertex adapters.
 examples/                  the table above, against a live model.
 ```
 
+## Which step
+
+`localise_steps` puts the trace in as one more evidence span and reads rung `k`
+with steps `1..k` present, the placeholder at `k=0`. Nested rather than a power
+set, so `delta = b(k) - b(k-1)` is attributable to step `k` alone. No anchor, no
+orbit, no `p*`.
+
+`python3 examples/run_localisation.py`, five wrong chains at `m=24`:
+
+| question | step found | delta | the step |
+|---|---|---|---|
+| stage | 2 | -0.7595 | *...and the step after stage 2 is stage 4* |
+| buffer | 2 | -0.5887 | *The stage-3 buffer is potassium acetate* |
+| elimination | 1 | -0.8927 | *...but stage 5 is an exception to that rule* |
+| date | 2 | -0.9773 | *2024 plus three is 2028* |
+| conditional | 2 or 3 | -0.2338 | *96.4 percent, which is above 98* |
+
+The first four name the step that introduced the error and reproduce across
+runs. `conditional` does not: its rungs 2 and 3 sit at -0.2338 and -0.0920 in one
+run and swap the argmax in the next, because the model never accepts that chain's
+false comparison, so no single rung carries the movement. At `m=1` the same
+instability spreads — `buffer` misses in one run, `conditional` in another.
+
+**Read the delta, not the argmax.** A trace where no rung clears about 0.05, or
+where two rungs are within noise of each other, has not been localised; the
+example prints that flag.
+
+`isolate_steps` reads each step alone instead, and lands on the concluding step
+rather than the faulty one: an error is a step wrong *in context*.
+
 ## Cost
 
 `contexts x min(n!, m)` one-token calls per decision, where `contexts` is the
 evidence context plus your nulls plus two diagnostics. Measured at m=120 with
 three nulls: **720 calls**, or **480** with `run_diagnostic_ablations=False`.
+
+`abstain_fast` pays none of it. It stops on `core.sequential_decision`, a
+confidence sequence, so optional stopping needs no correction; and once the
+*upper* bound on `b` is below `p*` no anchor can rescue it, so the nulls never
+run. Four of the five example chains refuse that way in 8 to 64 draws, and no
+correct chain trips it within 32. The fifth returns `undetermined`, which is the
+case where the draws are doing real work.
+
+Watch `discarded`. A cell absent from the returned softmax is an instrument
+failure, not an interval, so those draws are dropped -- `date` reached its
+verdict on 5 usable draws out of 64. Dropping them biases `b` upward, so an
+abstention despite discards is conservative and a `needs_anchor` is not.
 
 `m` caps the orderings rather than setting them. Five spans have an orbit of
 5! = 120, so m=120 enumerates it exactly and `b` is the order-marginal itself

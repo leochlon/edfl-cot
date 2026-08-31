@@ -32,7 +32,7 @@ import logging
 import math
 import random
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, MutableMapping, Optional, Sequence, Tuple
 
 from . import core
@@ -53,9 +53,16 @@ __all__ = [
     "ContextReadouts",
     "ValidityReport",
     "SpanDiagnostics",
+    "PrefixRung",
+    "PrefixLadder",
+    "split_steps",
     "TraceTelemetry",
     "CotBudgetResult",
     "score_cot_budget",
+    "abstain_fast",
+    "localise_steps",
+    "isolate_steps",
+    "AbstainResult",
     "twin_trace_audit",
     "clear_verifier_cache",
 ]
@@ -142,6 +149,8 @@ class BatteryConfig:
     # Diagnostics are optional and cost m probes per span subset.
     span_diagnostics: bool = False
     max_span_subsets: int = 8
+    # Cumulative-prefix ladder: m probes per step, plus one for the empty rung.
+    prefix_ladder: bool = False
     temperature: float = 0.0
     top_logprobs: int = 20
     use_cache: bool = True
@@ -398,6 +407,65 @@ class SpanDiagnostics:
 
 
 @dataclass
+class PrefixRung:
+    k: int
+    step: str
+    b_hat: float
+    b_lo: float
+    delta: float                 # b_hat(k) - b_hat(k-1); nan at k=0
+    order_evidence: float
+    d_mean: float
+    usable: int
+
+
+@dataclass
+class PrefixLadder:
+    """Where along the trace the belief moves.
+
+    Rung ``k`` carries the first ``k`` steps as one extra evidence span, so the
+    span count and the frame are constant. Each prefix is one atomic block and
+    the steps are never permuted, so the serialization law still acts only on
+    the coordinate it is defined on. The family is nested rather than a power
+    set, which is what makes ``delta`` at rung ``k`` attributable to step ``k``.
+    """
+
+    rungs: List[PrefixRung] = field(default_factory=list)
+    localised_step: Optional[int] = None    # argmax |delta|, 1-indexed; None if empty
+    localised_delta: float = float("nan")
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {"rungs": [r.__dict__ for r in self.rungs],
+                "localised_step": self.localised_step,
+                "localised_delta": self.localised_delta}
+
+
+@dataclass
+class AbstainResult:
+    """Outcome of the cheap path, which never touches an anchor.
+
+    ``abstain`` means the upper bound on ``b`` fell below ``p*``: no anchor can
+    rescue that, so the null batteries are not run. ``needs_anchor`` means the
+    lower bound cleared ``p*`` and only the anchor is left to decide, so the
+    caller should escalate to :func:`score_cot_budget`. ``undetermined`` means the
+    sequence straddled ``p*`` until the cap -- a genuine third outcome, not a
+    failure, and the case where the draws are doing real work.
+
+    ``draws`` counts usable readouts and ``calls`` the probes spent; the gap is
+    ``discarded``, readouts where a cell was absent from the returned softmax.
+    A cell leaves the list exactly when its mass is low, so discarding biases
+    ``b`` upward -- which makes an abstention reached in spite of discards
+    conservative, and a ``needs_anchor`` reached with many of them suspect.
+    """
+
+    decision: str            # "abstain" | "needs_anchor" | "undetermined"
+    b_lo: float
+    b_hi: float
+    draws: int
+    calls: int
+    discarded: int = 0
+
+
+@dataclass
 class TraceTelemetry:
     """Reported, never charged, except where the paper says otherwise."""
 
@@ -423,6 +491,7 @@ class CotBudgetResult:
     anchor_hat: List[float]
     cells: CellSpec
     spans: SpanDiagnostics = field(default_factory=SpanDiagnostics)
+    ladder: PrefixLadder = field(default_factory=PrefixLadder)
     error: Optional[str] = None
 
     @property
@@ -438,6 +507,7 @@ class CotBudgetResult:
             "b_hat": list(self.b_hat),
             "anchor_hat": list(self.anchor_hat),
             "spans": self.spans.__dict__,
+            "ladder": self.ladder.as_dict(),
             "error": self.error,
         }
 
@@ -665,8 +735,17 @@ def score_cot_budget(
             post_supports=bool(b_lo >= cfg.p_star),
         )
 
+    ladder = PrefixLadder()
+    if cfg.prefix_ladder and reasoning_text.strip():
+        ladder = _prefix_ladder(
+            backend=backend, backend_cfg=backend_cfg, model=model, spans=spans,
+            question=question, cells=cells, cfg=cfg, reasoning_text=reasoning_text,
+            prompt_cache=prompt_cache,
+        )
+
     return CotBudgetResult(gate=g, validity=validity, telemetry=telemetry,
-                           b_hat=ev.b, anchor_hat=ab.b, cells=cells, spans=spans_diag)
+                           b_hat=ev.b, anchor_hat=ab.b, cells=cells, spans=spans_diag,
+                           ladder=ladder)
 
 
 def _rho_charge(cfg: "BatteryConfig", n_tokens: int) -> float:
@@ -738,6 +817,225 @@ def _span_diagnostics(
     return SpanDiagnostics(individually_removable=removable, individually_sufficient=sufficient,
                            redundant_evidence=redundant, conjunctive_evidence=conjunctive,
                            subset_marginals=marginals)
+
+
+_STEP_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
+
+def split_steps(reasoning_text: str) -> List[str]:
+    """Sentence-per-step split. Replace it where the trace has real markers."""
+    return [s.strip() for s in _STEP_SPLIT.split(reasoning_text.strip()) if s.strip()]
+
+
+def _prefix_ladder(
+    *, backend: Any, backend_cfg: BackendConfig, model: str, spans: Sequence[Any],
+    question: str, cells: CellSpec, cfg: BatteryConfig, reasoning_text: str,
+    prompt_cache: Optional[MutableMapping[str, Any]],
+    steps: Optional[Sequence[str]] = None,
+) -> PrefixLadder:
+    """Cumulative prefixes as one extra span, measured at the order-marginal.
+
+    Rung ``k`` is read over its own orbit, so ``b_lo`` keeps the coverage the
+    one-rung gate has. The empty rung uses the placeholder rather than dropping
+    the span: deleting it changes the frame, and a conspicuous redaction moves
+    ``d`` before it moves belief, which is the same reason the anchor is a donor
+    family and not a deletion.
+    """
+    steps = list(steps) if steps is not None else split_steps(reasoning_text)
+    if not steps:
+        return PrefixLadder()
+
+    n = len(spans) + 1
+    orders = _serializations(n, cfg.m_serializations, cfg.seed)
+    base = [{"sid": _span_sid(s), "text": _span_text(s)} for s in spans]
+    a = cells.committed
+
+    rungs: List[PrefixRung] = []
+    prev = float("nan")
+    for k in range(len(steps) + 1):
+        text = " ".join(steps[:k]) if k else _PLACEHOLDER
+        ctx = base + [{"sid": "cot", "text": text}]
+        readouts = _run_battery(
+            backend=backend, backend_cfg=backend_cfg, model=model,
+            prompts=[build_scoring_prompt(spans=ctx, order=o, question=question, cells=cells)
+                     for o in orders],
+            orders=orders, cells=cells, cfg=cfg, prompt_cache=prompt_cache)
+        rung_ctx = ContextReadouts(name=f"prefix:{k}", readouts=readouts)
+        if not rung_ctx.usable:
+            continue
+        # One draw is enough for the delta, which is what localises; b_lo needs two.
+        b_hat = rung_ctx.b[a]
+        rungs.append(PrefixRung(
+            k=k, step=(steps[k - 1] if k else ""), b_hat=b_hat,
+            b_lo=(core.conf_lower(rung_ctx.cell_draws(a), cfg.alpha)
+                  if len(rung_ctx.usable) >= 2 else float("nan")),
+            delta=(b_hat - prev), order_evidence=rung_ctx.order_term(),
+            d_mean=rung_ctx.d_mean, usable=len(rung_ctx.usable)))
+        prev = b_hat
+
+    moved = [r for r in rungs if r.k > 0 and not math.isnan(r.delta)]
+    if not moved:
+        return PrefixLadder(rungs=rungs)
+    top = max(moved, key=lambda r: abs(r.delta))
+    return PrefixLadder(rungs=rungs, localised_step=top.k, localised_delta=top.delta)
+
+
+# --------------------------------------------------------------------------
+# The cheap paths. Only score_cot_budget pays for a certificate.
+# --------------------------------------------------------------------------
+
+
+def abstain_fast(
+    *,
+    trace: Any,
+    question: str,
+    cells: CellSpec,
+    model: str,
+    backend_cfg: Optional[BackendConfig] = None,
+    cfg: Optional[BatteryConfig] = None,
+    reasoning_text: str = "",
+    max_draws: int = 200,
+    block: int = 8,
+) -> AbstainResult:
+    """Refuse before touching a null, on an anytime-valid confidence sequence.
+
+    Draws stream in blocks and :func:`core.sequential_decision` stops as soon as
+    the sequence separates from ``p*``. Stopping needs no correction because the
+    object is a confidence sequence, not a fixed-sample interval.
+    """
+    cfg = cfg or BatteryConfig()
+    backend_cfg = backend_cfg or BackendConfig(kind="openai")
+    backend = make_backend(backend_cfg)
+    spans = list(getattr(trace, "spans", None)
+                 or (trace.get("spans") if isinstance(trace, dict) else []) or [])
+    ctx = [{"sid": _span_sid(s), "text": _span_text(s)} for s in spans]
+    n = len(ctx)
+    rng = random.Random(cfg.seed)
+    prompt_cache = _PROMPT_CACHE if cfg.use_cache else None
+    a = cells.committed
+
+    xs: List[float] = []
+    calls = 0
+    dec: Dict[str, Any] = {"decision": "undetermined", "lo": 0.0, "hi": 1.0, "stopped_at": 0}
+    while calls < max_draws:
+        # With replacement: the bound needs i.i.d. draws, and duplicates are cache hits.
+        orders = [tuple(rng.sample(range(n), n)) for _ in range(block)]
+        readouts = _run_battery(
+            backend=backend, backend_cfg=backend_cfg, model=model,
+            prompts=[build_scoring_prompt(spans=ctx, order=o, question=question, cells=cells,
+                                          reasoning=reasoning_text) for o in orders],
+            orders=orders, cells=cells, cfg=cfg, prompt_cache=prompt_cache)
+        calls += len(orders)
+        xs += [r.beta[a] for r in readouts if r.ok]
+        if len(xs) < 2:
+            continue
+        dec = core.sequential_decision(xs, cfg.p_star, cfg.alpha, min_draws=8)
+        if not dec["exhausted"]:
+            break
+
+    if float(dec["hi"]) < cfg.p_star:
+        decision = "abstain"
+    elif float(dec["lo"]) >= cfg.p_star:
+        decision = "needs_anchor"
+    else:
+        decision = "undetermined"
+    return AbstainResult(decision=decision, b_lo=float(dec["lo"]), b_hi=float(dec["hi"]),
+                         draws=len(xs), calls=calls, discarded=calls - len(xs))
+
+
+def localise_steps(
+    *,
+    trace: Any,
+    question: str,
+    cells: CellSpec,
+    model: str,
+    backend_cfg: Optional[BackendConfig] = None,
+    cfg: Optional[BatteryConfig] = None,
+    reasoning_text: str = "",
+    steps: Optional[Sequence[str]] = None,
+    m: int = 1,
+) -> PrefixLadder:
+    """Which step moved the belief. ``N+1`` calls at ``m=1``, no anchor, no bound.
+
+    Read ``localised_delta``, not ``localised_step``: a trace where no rung
+    clears about 0.05, or where two rungs sit within noise of each other, has
+    not been localised. Raise ``m`` in that case.
+    """
+    cfg = cfg or BatteryConfig()
+    backend_cfg = backend_cfg or BackendConfig(kind="openai")
+    spans = list(getattr(trace, "spans", None)
+                 or (trace.get("spans") if isinstance(trace, dict) else []) or [])
+    return _prefix_ladder(
+        backend=make_backend(backend_cfg), backend_cfg=backend_cfg, model=model, spans=spans,
+        question=question, cells=cells, cfg=replace(cfg, m_serializations=int(m)),
+        reasoning_text=reasoning_text,
+        prompt_cache=(_PROMPT_CACHE if cfg.use_cache else None), steps=steps)
+
+
+def isolate_steps(
+    *,
+    trace: Any,
+    question: str,
+    cells: CellSpec,
+    model: str,
+    backend_cfg: Optional[BackendConfig] = None,
+    cfg: Optional[BatteryConfig] = None,
+    reasoning_text: str = "",
+    steps: Optional[Sequence[str]] = None,
+    m: int = 1,
+) -> PrefixLadder:
+    """Each step alone, with no predecessors. Do not use it to find an error.
+
+    A step read alone moves belief hardest when it states a conclusion, so the
+    argmax lands on the final step rather than the faulty one. An error is a
+    step wrong *in context*, which :func:`localise_steps` measures and this does
+    not; it is here for that contrast.
+    """
+    cfg = cfg or BatteryConfig()
+    backend_cfg = backend_cfg or BackendConfig(kind="openai")
+    spans = list(getattr(trace, "spans", None)
+                 or (trace.get("spans") if isinstance(trace, dict) else []) or [])
+    step_list = list(steps) if steps is not None else split_steps(reasoning_text)
+    if not step_list:
+        return PrefixLadder()
+
+    backend = make_backend(backend_cfg)
+    cfg_m = replace(cfg, m_serializations=int(m))
+    base = [{"sid": _span_sid(s), "text": _span_text(s)} for s in spans]
+    orders = _serializations(len(base) + 1, cfg_m.m_serializations, cfg_m.seed)
+    a = cells.committed
+
+    def rung_b(text: str) -> Optional[ContextReadouts]:
+        readouts = _run_battery(
+            backend=backend, backend_cfg=backend_cfg, model=model,
+            prompts=[build_scoring_prompt(spans=base + [{"sid": "cot", "text": text}],
+                                          order=o, question=question, cells=cells)
+                     for o in orders],
+            orders=orders, cells=cells, cfg=cfg_m,
+            prompt_cache=(_PROMPT_CACHE if cfg.use_cache else None))
+        ctx = ContextReadouts(name="singleton", readouts=readouts)
+        return ctx if ctx.usable else None
+
+    empty = rung_b(_PLACEHOLDER)
+    if empty is None:
+        return PrefixLadder()
+    b0 = empty.b[a]
+    rungs = [PrefixRung(k=0, step="", b_hat=b0, b_lo=core.conf_lower(empty.cell_draws(a), cfg.alpha),
+                        delta=float("nan"), order_evidence=empty.order_term(),
+                        d_mean=empty.d_mean, usable=len(empty.usable))]
+    for i, step in enumerate(step_list, start=1):
+        ctx = rung_b(step)
+        if ctx is None:
+            continue
+        rungs.append(PrefixRung(k=i, step=step, b_hat=ctx.b[a],
+                                b_lo=core.conf_lower(ctx.cell_draws(a), cfg.alpha),
+                                delta=ctx.b[a] - b0, order_evidence=ctx.order_term(),
+                                d_mean=ctx.d_mean, usable=len(ctx.usable)))
+    moved = [r for r in rungs if r.k > 0 and not math.isnan(r.delta)]
+    if not moved:
+        return PrefixLadder(rungs=rungs)
+    top = max(moved, key=lambda r: abs(r.delta))
+    return PrefixLadder(rungs=rungs, localised_step=top.k, localised_delta=top.delta)
 
 
 # --------------------------------------------------------------------------

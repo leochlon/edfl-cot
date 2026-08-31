@@ -6,6 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "edfl-cot"
 version = "14.1.0"
 description = "Answer or abstain on whether evidence and reasoning moved the model's belief"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Hassana Labs", email = "lc574@cantab.ac.uk" }]
 requires-python = ">=3.9"
 dependencies = ["openai>=1.0"]
 
