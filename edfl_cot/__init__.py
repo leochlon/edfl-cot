@@ -2,6 +2,7 @@
 
 Four paths, in ascending cost. Take the cheapest one that answers your question.
 
+    open_answer(...)     -> OpenAnswer      no options given: answer, then the claim to gate
     abstain_fast(...)    -> AbstainResult   refuse without touching a null
     localise_steps(...)  -> PrefixLadder    which step moved the belief
     isolate_steps(...)   -> PrefixLadder    each step alone; measured 1/5, kept for contrast
@@ -17,14 +18,16 @@ from .core import (
 )
 from .gate import (
     AbstainResult, BatteryConfig, CellSpec, CotBudgetResult, PrefixLadder, PrefixRung,
-    Readout, ValidityReport, abstain_fast, build_scoring_prompt,
-    clear_verifier_cache, isolate_steps, localise_steps, score_cot_budget,
+    OpenAnswer, Readout, ValidityReport, YES_NO, abstain_fast, build_scoring_prompt,
+    clear_verifier_cache, isolate_steps, localise_steps, open_answer,
+    score_cot_budget,
     split_steps, twin_trace_audit,
 )
 
 __version__ = "14.1.0"
 __all__ = [
     "abstain_fast", "localise_steps", "isolate_steps",
+    "open_answer", "OpenAnswer", "YES_NO",
     "AbstainResult", "PrefixLadder", "PrefixRung", "split_steps",
     "score_cot_budget", "CellSpec", "BatteryConfig", "CotBudgetResult",
     "ValidityReport", "Readout", "build_scoring_prompt", "twin_trace_audit",

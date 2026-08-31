@@ -15,11 +15,11 @@ KW = dict(trace=TRACE, question="Is A C?", cells=CELLS, model="m",
 
 
 def test_abstain_fast_refuses_without_an_anchor():
-    r = abstain_fast(max_draws=32, block=8, **KW)
+    r = abstain_fast(max_draws=30, block=5, **KW)
     assert r.decision == "abstain", r
     assert r.b_hi < CFG.p_star
-    assert r.calls < 32, r.calls          # stopped before the cap
-    assert r.calls % 8 == 0 and r.draws + r.discarded == r.calls
+    assert r.calls < 30, r.calls          # stopped before the cap
+    assert r.calls % 5 == 0 and r.draws + r.discarded == r.calls
 
 
 def test_localise_returns_one_rung_per_step_plus_the_empty_one():
@@ -33,6 +33,14 @@ def test_isolate_measures_each_step_against_the_empty_rung():
     lad = isolate_steps(**KW)
     assert [r.k for r in lad.rungs] == [0, 1, 2, 3]
     assert all(r.step for r in lad.rungs[1:])
+
+
+def test_split_steps_keeps_numbered_lines_whole():
+    from edfl_cot import split_steps
+    assert split_steps("1. A is B.\n2. B is C.") == ["1. A is B.", "2. B is C."]
+    assert split_steps("A is B. B is C.") == ["A is B.", "B is C."]
+    assert split_steps("1.\n2.") == []          # enumerators are not steps
+    assert split_steps("") == []
 
 
 if __name__ == "__main__":
