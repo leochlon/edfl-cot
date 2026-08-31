@@ -15,6 +15,7 @@ class BackendConfig:
     timeout_s: Optional[float] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None
+    options: Optional[dict] = None   # local backend: model_id, device, dtype, batch, topk, chat_template
 
 
 class OpenAIBackend:
@@ -107,6 +108,10 @@ def make_backend(cfg: BackendConfig):
         return GeminiBackend(cfg)
     if kind == "vertex":
         return VertexBackend(cfg)
+    if kind == "local":
+        from .local_backend import LocalBackend
+
+        return LocalBackend(cfg)
     if kind == "dummy":
         return DummyBackend()
     raise ValueError(f"Unknown backend kind: {cfg.kind!r}")

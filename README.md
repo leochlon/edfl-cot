@@ -109,6 +109,21 @@ where two rungs are within noise, has not been localised. `isolate_steps` reads
 each step alone instead, and lands on the concluding step rather than the faulty
 one: an error is a step wrong *in context*.
 
+## Local models
+
+`kind="local"` reads the scoring position from `transformers` weights, so the
+softmax is complete and no cell can fall off a top-k list. On the `stage` item
+Qwen2.5-1.5B-Instruct gave 120/120 usable serializations and `d_evidence` 1.0000,
+where a hosted run of a comparable item discarded 59 of 64 draws.
+
+```python
+BackendConfig(kind="local", options={"model_id": "Qwen/Qwen2.5-1.5B-Instruct"})
+```
+
+`options` also takes `device`, `dtype`, `batch`, `topk` and `chat_template`. The
+last one decides the frame, and the frame decides the cell token: through a
+template a model wants `"A"`, on a raw prompt it wants `" A"`.
+
 ## Cost
 
 `contexts x min(n!, m)` one-token calls per certificate — evidence plus nulls plus

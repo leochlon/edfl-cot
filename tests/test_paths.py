@@ -43,6 +43,16 @@ def test_split_steps_keeps_numbered_lines_whole():
     assert split_steps("") == []
 
 
+def test_local_backend_is_dispatched_and_validated():
+    from edfl_cot.backends.base import BackendConfig, make_backend
+    try:
+        make_backend(BackendConfig(kind="local"))
+    except ValueError as exc:
+        assert "model_id" in str(exc)
+    else:
+        raise AssertionError("local backend accepted a config with no model_id")
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
