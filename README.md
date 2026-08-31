@@ -154,15 +154,3 @@ abstention despite discards is conservative and a `needs_anchor` is not.
 5! = 120, so m=120 enumerates it exactly and `b` is the order-marginal itself
 with no sampling error; above about seven spans the orbit is sampled and `m`
 sets the confidence width.
-
-## Two things that will bite
-
-**Cell tokens are a property of the frame, not the label.** Under a raw prompt a
-base model wants `" C"`; through a chat template the same model with the same
-tokenizer wants `"C"`. Get it wrong and the native candidate mass `d` collapses to
-1e-4 while the renormalised belief still reads 1.0 — a confident answer about
-nothing. `ValidityReport.d_evidence` is the check.
-
-**Top-k readouts select on the outcome.** A cell leaves the returned list exactly
-when its mass is low, so discarding truncated draws biases the estimate in a way
-more draws cannot fix. Score every cell exactly where the endpoint allows it.
