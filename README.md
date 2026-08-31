@@ -127,18 +127,6 @@ failure, not an interval, so those draws are dropped — one example reached its
 verdict on 5 usable draws out of 64. Dropping them biases `b` upward, so an
 abstention despite discards is conservative and a `needs_anchor` is not.
 
-## Two things that will bite
-
-**Cell tokens are a property of the frame, not the label.** Under a raw prompt a
-base model wants `" C"`; through a chat template the same model with the same
-tokenizer wants `"C"`. Get it wrong and the native candidate mass `d` collapses to
-1e-4 while the renormalised belief still reads 1.0 — a confident answer about
-nothing. `ValidityReport.d_evidence` is the check.
-
-**Top-k readouts select on the outcome.** A cell leaves the returned list exactly
-when its mass is low, so discarding truncated draws biases the estimate in a way
-more draws cannot fix. Score every cell exactly where the endpoint allows it.
-
 ## Layout
 
 ```
