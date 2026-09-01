@@ -105,6 +105,15 @@ class TokenTopK:
     kth_logprob: Optional[float]
 
 
+def _logaddexp(a: float, b: float) -> float:
+    if a == -math.inf:
+        return b
+    if b == -math.inf:
+        return a
+    hi, lo = (a, b) if a > b else (b, a)
+    return hi + math.log1p(math.exp(lo - hi))
+
+
 def _token_topk_at(seq: Sequence[Any], pos: int) -> TokenTopK:
     tokinfo = seq[pos]
     gen_tok = _get_token(tokinfo)
@@ -122,7 +131,12 @@ def _token_topk_at(seq: Sequence[Any], pos: int) -> TokenTopK:
         key = tt.lstrip()
         if key == "":
             continue
-        topk[key] = max(topk.get(key, -math.inf), float(lp))
+        # " A" and "A" are distinct vocabulary tokens carrying separate mass.
+        # Keying on the stripped form collides them, so they must be summed;
+        # taking the max silently discards the smaller, and does so hardest on
+        # the cell that is winning, which is the cell most likely to appear in
+        # several surface forms inside the same top-k.
+        topk[key] = _logaddexp(topk.get(key, -math.inf), float(lp))
 
     kth = None
     if top_list:

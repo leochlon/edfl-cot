@@ -223,6 +223,24 @@ class ContextReadouts:
         return core.j_mu(self.betas)
 
 
+_CELL_EDGE = re.compile(r"^[^0-9A-Za-z]*([0-9A-Za-z]+)")
+
+
+def _cell_key(tok: Any) -> str:
+    """Cell identity of a decoded token, ignoring surrounding punctuation.
+
+    ``canonical_answer_label`` only knows YES/NO/UNSURE, so for a label set like
+    ("A", "B") it returns None and the old fallback compared "A." and "A)"
+    literally, dropping them.
+    """
+    lab = canonical_answer_label(tok)
+    if lab:
+        return lab
+    raw = str(tok).strip().upper()
+    m = _CELL_EDGE.match(raw)
+    return m.group(1) if m else raw
+
+
 def _readout_from_logprobs(logprobs: Any, cells: CellSpec, serialization: Tuple[int, ...]) -> Readout:
     """Build ``(d, beta)`` from a full-softmax readout at the scoring position.
 
@@ -243,7 +261,7 @@ def _readout_from_logprobs(logprobs: Any, cells: CellSpec, serialization: Tuple[
         mass = sum(
             math.exp(float(lp))
             for tok, lp in table.items()
-            if (canonical_answer_label(tok) or str(tok).strip().upper()) == want
+            if _cell_key(tok) == want
         )
         probs.append(mass)
 
@@ -871,8 +889,7 @@ def _prefix_ladder(
     if not steps:
         return PrefixLadder()
 
-    n = len(spans) + 1
-    orders = _serializations(n, cfg.m_serializations, cfg.seed)
+    orders = _serializations(len(spans), cfg.m_serializations, cfg.seed)
     base = [{"sid": _span_sid(s), "text": _span_text(s)} for s in spans]
     a = cells.committed
 
@@ -880,14 +897,22 @@ def _prefix_ladder(
     prev = float("nan")
     for k in range(len(steps) + 1):
         text = " ".join(steps[:k]) if k else _PLACEHOLDER
-        ctx = base + [{"sid": "cot", "text": text}]
+        # The trace goes where score_cot_budget puts it: directly above ANSWER:.
+        # As a <SPAN> it was inside the evidence block, under the header calling
+        # spans untrusted quoted material, so the ladder and the certificate
+        # were reading two different objects.
         readouts = _run_battery(
             backend=backend, backend_cfg=backend_cfg, model=model,
-            prompts=[build_scoring_prompt(spans=ctx, order=o, question=question, cells=cells)
+            prompts=[build_scoring_prompt(spans=base, order=o, question=question,
+                                          cells=cells, reasoning=text)
                      for o in orders],
             orders=orders, cells=cells, cfg=cfg, prompt_cache=prompt_cache)
         rung_ctx = ContextReadouts(name=f"prefix:{k}", readouts=readouts)
         if not rung_ctx.usable:
+            # Without clearing prev, the next rung reports a two-step move as
+            # its own, and the dropped rung is preferentially the one where
+            # belief moved.
+            prev = float("nan")
             continue
         # One draw is enough for the delta, which is what localises; b_lo needs two.
         b_hat = rung_ctx.b[a]
@@ -958,10 +983,12 @@ def open_answer(
         model=model, instructions=_OPEN_INSTRUCTIONS, temperature=float(temperature),
         max_output_tokens=int(max_output_tokens), include_logprobs=False, top_logprobs=0)
     raw = str(getattr(res, "text", "") or "")
-    m = _ANSWER_LINE.search(raw)
-    if not m:
+    found = _ANSWER_LINE.findall(raw)
+    if not found:
         return None
-    answer = m.group(1).strip()
+    # A self-revising generation states ANSWER: more than once; the last one is
+    # what it committed to, the first is what it later corrected.
+    answer = found[-1].strip()
     reasoning = _ANSWER_LINE.sub("", raw).strip()
     claim = (f"CLAIM: In answer to \"{question.strip()}\", the answer is {answer}\n\n"
              "Is the CLAIM supported by the evidence?  YES   NO")

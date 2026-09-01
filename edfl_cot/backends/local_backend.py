@@ -73,7 +73,18 @@ class LocalBackend:
             return f"{sysmsg}<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
 
     def call_text_batch(self, *, prompts: Sequence[str], instructions: str = "",
+                        max_output_tokens: int = 1, temperature: float = 0.0,
                         **_kw: Any) -> List[TextResult]:
+        """Score one position, or generate when more than one token is asked for.
+
+        ``open_answer`` requests 384 tokens and agentic callers ask for hundreds;
+        this backend used to swallow ``max_output_tokens`` in ``**_kw`` and
+        return a single token regardless, so those paths came back truncated to
+        one character with no error raised.
+        """
+        if int(max_output_tokens) > 1:
+            return self._generate(prompts, instructions, int(max_output_tokens),
+                                  float(temperature))
         torch, out = self._torch, []
         rendered = [self._render(p, instructions) for p in prompts]
         with torch.no_grad():
@@ -90,6 +101,23 @@ class LocalBackend:
                         text=top[0]["token"], response_id=None,
                         logprobs=[{"token": top[0]["token"],
                                    "logprob": top[0]["logprob"], "top_logprobs": top}]))
+        return out
+
+    def _generate(self, prompts, instructions, max_new, temperature):
+        torch, out = self._torch, []
+        rendered = [self._render(p, instructions) for p in prompts]
+        with torch.no_grad():
+            for i in range(0, len(rendered), self.batch):
+                enc = self.tok(rendered[i:i + self.batch], return_tensors="pt",
+                               padding=True, add_special_tokens=False).to(self.device)
+                g = self.model.generate(
+                    **enc, max_new_tokens=max_new, do_sample=temperature > 0,
+                    temperature=temperature or None,
+                    pad_token_id=self.tok.pad_token_id or self.tok.eos_token_id)
+                for row in g[:, enc["input_ids"].shape[1]:]:
+                    out.append(TextResult(
+                        text=self.tok.decode(row, skip_special_tokens=True),
+                        response_id=None, logprobs=None))
         return out
 
     def call_text(self, *, prompt: str, **kw: Any) -> TextResult:
