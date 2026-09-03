@@ -302,6 +302,11 @@ def _serializations(n_spans: int, m: int, seed: int) -> List[Tuple[int, ...]]:
     return out
 
 
+def _orbit_exhausted(n_spans: int, orders: Sequence[Tuple[int, ...]]) -> bool:
+    """Whether ``orders`` covers the finite serialization orbit exactly."""
+    return len(set(orders)) == math.factorial(max(n_spans, 0))
+
+
 def _context_spans(spans: Sequence[Any], context: str, rng: random.Random) -> List[Dict[str, str]]:
     out: List[Dict[str, str]] = []
     for span in spans:
@@ -651,10 +656,13 @@ def score_cot_budget(
     # The anchor is the LARGEST member. Where the gate would answer the margin
     # is non-increasing in c, so the maximum is the conservative direction and
     # the guarantee strengthens to "would have answered under every member".
-    b_lo = core.conf_lower(ev.cell_draws(a), cfg.alpha)
+    orbit_exhausted = _orbit_exhausted(len(spans), orders)
+    exact_evidence = orbit_exhausted and len(ev.usable) == len(orders)
+    exact_family = orbit_exhausted and all(len(contexts[n].usable) == len(orders) for n in donor_names)
+    b_lo = ev.b[a] if exact_evidence else core.conf_lower(ev.cell_draws(a), cfg.alpha)
     family = core.anchor_from_family(
         {n: contexts[n].cell_draws(a) for n in donor_names},
-        alpha=cfg.alpha, tau=cfg.tau_ablation,
+        alpha=cfg.alpha, tau=cfg.tau_ablation, exact=exact_family,
     )
     anchor_c = family.anchor
     ablation_gap = family.spread

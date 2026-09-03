@@ -1,9 +1,8 @@
-"""transformers backend: one forward pass per prompt, exact cell masses.
+"""transformers backend: local generation plus scoring-position cell masses.
 
-The hosted path reads a top-k list, so a cell whose mass is low falls off the
-table and the readout is discarded -- 59 of 64 draws on one measured item. Here
-the softmax is complete, so ``d`` is measured rather than checked and the
-instrument-failure branch of ``_readout_from_logprobs`` is unreachable.
+For EDFL scoring, the backend runs one forward pass per prompt and reads the
+next-token distribution. For benchmark generation, it can also call
+``model.generate`` when logprobs are not requested.
 """
 from __future__ import annotations
 
@@ -55,6 +54,7 @@ class LocalBackend:
         self.batch = int(opts.get("batch", 16))
         self.topk = int(opts.get("topk", 64))
         self.chat_template = bool(opts.get("chat_template", True))
+        self.max_input_tokens = opts.get("max_input_tokens")
         self.tok, self.model, self.device, self._torch = _load(
             self.model_id, opts.get("device"), opts.get("dtype"))
 
@@ -72,8 +72,7 @@ class LocalBackend:
             sysmsg = f"<|im_start|>system\n{instructions}<|im_end|>\n" if instructions else ""
             return f"{sysmsg}<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
 
-    def call_text_batch(self, *, prompts: Sequence[str], instructions: str = "",
-                        **_kw: Any) -> List[TextResult]:
+    def _score_batch(self, *, prompts: Sequence[str], instructions: str = "") -> List[TextResult]:
         torch, out = self._torch, []
         rendered = [self._render(p, instructions) for p in prompts]
         with torch.no_grad():
@@ -91,6 +90,67 @@ class LocalBackend:
                         logprobs=[{"token": top[0]["token"],
                                    "logprob": top[0]["logprob"], "top_logprobs": top}]))
         return out
+
+    def _generate_batch(
+        self,
+        *,
+        prompts: Sequence[str],
+        instructions: str = "",
+        max_output_tokens: int = 256,
+        temperature: float = 0.0,
+        repetition_penalty: float = 1.0,
+        top_p: Optional[float] = None,
+        top_k: Optional[int] = None,
+    ) -> List[TextResult]:
+        torch, out = self._torch, []
+        rendered = [self._render(p, instructions) for p in prompts]
+        with torch.no_grad():
+            for i in range(0, len(rendered), self.batch):
+                enc = self.tok(
+                    rendered[i:i + self.batch],
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=bool(self.max_input_tokens),
+                    max_length=self.max_input_tokens,
+                    add_special_tokens=False,
+                ).to(self.device)
+                input_len = enc["input_ids"].shape[1]
+                kwargs = {
+                    "max_new_tokens": int(max_output_tokens),
+                    "pad_token_id": self.tok.pad_token_id,
+                    "eos_token_id": self.tok.eos_token_id,
+                    "repetition_penalty": float(repetition_penalty),
+                }
+                if float(temperature) > 0.0:
+                    kwargs.update({"do_sample": True, "temperature": float(temperature)})
+                    if top_p is not None:
+                        kwargs["top_p"] = float(top_p)
+                    if top_k is not None:
+                        kwargs["top_k"] = int(top_k)
+                else:
+                    kwargs.update({"do_sample": False})
+                seq = self.model.generate(**enc, **kwargs)
+                for row in seq:
+                    text = self.tok.decode(row[input_len:], skip_special_tokens=True)
+                    out.append(TextResult(text=text, response_id=None, logprobs=None))
+        return out
+
+    def call_text_batch(self, *, prompts: Sequence[str], instructions: str = "",
+                        include_logprobs: bool = False, max_output_tokens: int = 64,
+                        temperature: float = 0.0, repetition_penalty: float = 1.0,
+                        top_p: Optional[float] = None, top_k: Optional[int] = None,
+                        **_kw: Any) -> List[TextResult]:
+        if include_logprobs:
+            return self._score_batch(prompts=prompts, instructions=instructions)
+        return self._generate_batch(
+            prompts=prompts,
+            instructions=instructions,
+            max_output_tokens=max_output_tokens,
+            temperature=temperature,
+            repetition_penalty=repetition_penalty,
+            top_p=top_p,
+            top_k=top_k,
+        )
 
     def call_text(self, *, prompt: str, **kw: Any) -> TextResult:
         return self.call_text_batch(prompts=[prompt], **kw)[0]

@@ -1,0 +1,13 @@
+backend: local
+model: Qwen/Qwen2.5-1.5B-Instruct
+m_serializations: 24
+alpha: 0.05
+p_star: 0.95
+top_logprobs: 64
+seed: 0
+max_concurrency: 1
+use_cache: true
+local_model_id: Qwen/Qwen2.5-1.5B-Instruct
+local_batch: 16
+local_topk: 64
+local_chat_template: false

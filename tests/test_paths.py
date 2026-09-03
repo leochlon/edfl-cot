@@ -2,7 +2,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from edfl_cot import BatteryConfig, CellSpec, abstain_fast, isolate_steps, localise_steps
+from edfl_cot import BatteryConfig, CellSpec, abstain_fast, isolate_steps, localise_steps, score_cot_budget
 from edfl_cot.backends.base import BackendConfig
 
 CELLS = CellSpec(labels=("YES", "NO"), committed=0)
@@ -51,6 +51,25 @@ def test_local_backend_is_dispatched_and_validated():
         assert "model_id" in str(exc)
     else:
         raise AssertionError("local backend accepted a config with no model_id")
+
+
+def test_full_orbit_uses_exact_marginal_not_sampling_bound():
+    donors = [
+        [{"sid": "d1", "text": "Unrelated."}, {"sid": "d2", "text": "Still unrelated."}],
+        [{"sid": "e1", "text": "Other."}, {"sid": "e2", "text": "More other."}],
+    ]
+    r = score_cot_budget(
+        trace=TRACE,
+        question="Is A C?",
+        cells=CELLS,
+        model="m",
+        backend_cfg=BCFG,
+        cfg=CFG,
+        donor_span_sets=donors,
+        reasoning_text=COT,
+    )
+    assert r.gate.b_lo == r.b_hat[CELLS.committed]
+    assert r.gate.anchor == r.anchor_hat[CELLS.committed]
 
 
 if __name__ == "__main__":

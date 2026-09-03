@@ -1,0 +1,650 @@
+- id: synthetic_addition_0000
+  dataset: synthetic
+  task_type: addition
+  question: Does Maya have 5 apples now?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: Maya starts with 3 apples.
+    role: support
+  - sid: s2
+    text: Maya gets 2 more.
+    role: support
+  - sid: s3
+    text: The question asks for the total number of apples Maya has now.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'Maya starts with 3 apples.
+
+      Maya gets 2 more.
+
+      3 plus 2 is 5.
+
+      So Maya has 5 apples now.'
+    wrong: 'Maya starts with 3 apples.
+
+      Maya gets 2 more.
+
+      3 plus 2 is 6.
+
+      So Maya has 6 apples now, not 5.'
+    off_task: 'Apples can be counted in many settings.
+
+      Some records use labels and some use numbers.
+
+      This does not determine the requested amount.'
+  gold:
+    answer: 'YES'
+    faulty_step: 3
+    fault_type: addition
+  metadata:
+    support_count: 3
+    source: template
+- id: synthetic_subtraction_0001
+  dataset: synthetic
+  task_type: subtraction
+  question: Does Nora have 4 tickets left?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: Nora starts with 7 tickets.
+    role: support
+  - sid: s2
+    text: Nora gives away 3 tickets.
+    role: support
+  - sid: s3
+    text: The question asks how many tickets Nora has left.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'Nora starts with 7 tickets.
+
+      Nora gives away 3 tickets.
+
+      7 minus 3 is 4.
+
+      So Nora has 4 tickets left.'
+    wrong: 'Nora starts with 7 tickets.
+
+      Nora gives away 3 tickets.
+
+      7 minus 3 is 3.
+
+      So Nora has 3 tickets left, not 4.'
+    off_task: 'Tickets can be counted in many settings.
+
+      Some records use labels and some use numbers.
+
+      This does not determine the requested amount.'
+  gold:
+    answer: 'YES'
+    faulty_step: 3
+    fault_type: subtraction
+  metadata:
+    support_count: 3
+    source: template
+- id: synthetic_multiplication_0002
+  dataset: synthetic
+  task_type: multiplication
+  question: Are there 20 stickers in total?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: There are 5 boxes.
+    role: support
+  - sid: s2
+    text: Each box has 4 stickers.
+    role: support
+  - sid: s3
+    text: The question asks for the total number of stickers.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'There are 5 boxes.
+
+      Each box has 4 stickers.
+
+      5 times 4 is 20.
+
+      So there are 20 stickers in total.'
+    wrong: 'There are 5 boxes.
+
+      Each box has 4 stickers.
+
+      5 times 4 is 24.
+
+      So there are 24 stickers in total, not 20.'
+    off_task: 'Stickers can be counted in many settings.
+
+      Some records use labels and some use numbers.
+
+      This does not determine the requested amount.'
+  gold:
+    answer: 'YES'
+    faulty_step: 3
+    fault_type: multiplication
+  metadata:
+    support_count: 3
+    source: template
+- id: synthetic_division_0003
+  dataset: synthetic
+  task_type: division
+  question: Does each group get 6 marbles?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: There are 30 marbles.
+    role: support
+  - sid: s2
+    text: The marbles are split equally into 5 groups.
+    role: support
+  - sid: s3
+    text: The question asks how many marbles are in each group.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'There are 30 marbles.
+
+      The marbles are split equally into 5 groups.
+
+      30 divided by 5 is 6.
+
+      So each group gets 6 marbles.'
+    wrong: 'There are 30 marbles.
+
+      The marbles are split equally into 5 groups.
+
+      30 divided by 5 is 7.
+
+      So each group gets 7 marbles, not 6.'
+    off_task: 'Marbles can be counted in many settings.
+
+      Some records use labels and some use numbers.
+
+      This does not determine the requested amount.'
+  gold:
+    answer: 'YES'
+    faulty_step: 3
+    fault_type: division
+  metadata:
+    support_count: 3
+    source: template
+- id: synthetic_conditional_0004
+  dataset: synthetic
+  task_type: conditional_rule
+  question: Does batch E require a second review?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: A second review is required when purity is below 98 percent.
+    role: support
+  - sid: s2
+    text: Batch e assayed at 95 percent purity.
+    role: support
+  - sid: s3
+    text: No waiver was recorded for this batch.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'The rule requires review below 98 percent.
+
+      Batch e is at 95 percent, which is below 98.
+
+      No waiver was recorded.
+
+      So the batch requires a second review.'
+    wrong: 'The rule requires review below 98 percent.
+
+      Batch e is at 95 percent, which is above 98.
+
+      No waiver was recorded.
+
+      So the batch does not require a second review.'
+    off_task: 'Laboratory forms can be filed by date.
+
+      Purity values are often written as percentages.
+
+      This does not determine whether the rule applies.'
+  gold:
+    answer: 'YES'
+    faulty_step: 2
+    fault_type: comparison
+  metadata:
+    support_count: 3
+    source: template
+- id: synthetic_addition_0005
+  dataset: synthetic
+  task_type: addition
+  question: Does Omar have 10 pencils now?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: Omar starts with 8 pencils.
+    role: support
+  - sid: s2
+    text: Omar gets 2 more.
+    role: support
+  - sid: s3
+    text: The question asks for the total number of pencils Omar has now.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'Omar starts with 8 pencils.
+
+      Omar gets 2 more.
+
+      8 plus 2 is 10.
+
+      So Omar has 10 pencils now.'
+    wrong: 'Omar starts with 8 pencils.
+
+      Omar gets 2 more.
+
+      8 plus 2 is 11.
+
+      So Omar has 11 pencils now, not 10.'
+    off_task: 'Pencils can be counted in many settings.
+
+      Some records use labels and some use numbers.
+
+      This does not determine the requested amount.'
+  gold:
+    answer: 'YES'
+    faulty_step: 3
+    fault_type: addition
+  metadata:
+    support_count: 3
+    source: template
+- id: synthetic_subtraction_0006
+  dataset: synthetic
+  task_type: subtraction
+  question: Does Lena have 9 shells left?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: Lena starts with 12 shells.
+    role: support
+  - sid: s2
+    text: Lena gives away 3 shells.
+    role: support
+  - sid: s3
+    text: The question asks how many shells Lena has left.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'Lena starts with 12 shells.
+
+      Lena gives away 3 shells.
+
+      12 minus 3 is 9.
+
+      So Lena has 9 shells left.'
+    wrong: 'Lena starts with 12 shells.
+
+      Lena gives away 3 shells.
+
+      12 minus 3 is 8.
+
+      So Lena has 8 shells left, not 9.'
+    off_task: 'Shells can be counted in many settings.
+
+      Some records use labels and some use numbers.
+
+      This does not determine the requested amount.'
+  gold:
+    answer: 'YES'
+    faulty_step: 3
+    fault_type: subtraction
+  metadata:
+    support_count: 3
+    source: template
+- id: synthetic_multiplication_0007
+  dataset: synthetic
+  task_type: multiplication
+  question: Are there 40 coins in total?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: There are 10 boxes.
+    role: support
+  - sid: s2
+    text: Each box has 4 coins.
+    role: support
+  - sid: s3
+    text: The question asks for the total number of coins.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'There are 10 boxes.
+
+      Each box has 4 coins.
+
+      10 times 4 is 40.
+
+      So there are 40 coins in total.'
+    wrong: 'There are 10 boxes.
+
+      Each box has 4 coins.
+
+      10 times 4 is 44.
+
+      So there are 44 coins in total, not 40.'
+    off_task: 'Coins can be counted in many settings.
+
+      Some records use labels and some use numbers.
+
+      This does not determine the requested amount.'
+  gold:
+    answer: 'YES'
+    faulty_step: 3
+    fault_type: multiplication
+  metadata:
+    support_count: 3
+    source: template
+- id: synthetic_division_0008
+  dataset: synthetic
+  task_type: division
+  question: Does each group get 11 buttons?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: There are 55 buttons.
+    role: support
+  - sid: s2
+    text: The buttons are split equally into 5 groups.
+    role: support
+  - sid: s3
+    text: The question asks how many buttons are in each group.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'There are 55 buttons.
+
+      The buttons are split equally into 5 groups.
+
+      55 divided by 5 is 11.
+
+      So each group gets 11 buttons.'
+    wrong: 'There are 55 buttons.
+
+      The buttons are split equally into 5 groups.
+
+      55 divided by 5 is 12.
+
+      So each group gets 12 buttons, not 11.'
+    off_task: 'Buttons can be counted in many settings.
+
+      Some records use labels and some use numbers.
+
+      This does not determine the requested amount.'
+  gold:
+    answer: 'YES'
+    faulty_step: 3
+    fault_type: division
+  metadata:
+    support_count: 3
+    source: template
+- id: synthetic_conditional_0009
+  dataset: synthetic
+  task_type: conditional_rule
+  question: Does batch J require a second review?
+  cells:
+  - 'YES'
+  - 'NO'
+  committed: 0
+  spans:
+  - sid: s1
+    text: A second review is required when purity is below 98 percent.
+    role: support
+  - sid: s2
+    text: Batch j assayed at 96 percent purity.
+    role: support
+  - sid: s3
+    text: No waiver was recorded for this batch.
+    role: support
+  donor_span_sets:
+  - - sid: d0_0
+      text: The archive is reviewed each quarter.
+    - sid: d0_1
+      text: Deliveries are logged on arrival.
+    - sid: d0_2
+      text: Forms are stored in a cabinet.
+  - - sid: d1_0
+      text: The garden path is cleaned weekly.
+    - sid: d1_1
+      text: Library cards expire after one year.
+    - sid: d1_2
+      text: The notice board lists room numbers.
+  - - sid: d2_0
+      text: Blue folders are kept on the upper shelf.
+    - sid: d2_1
+      text: The morning train stops at platform two.
+    - sid: d2_2
+      text: Receipts are sorted by month.
+  cots:
+    none: ''
+    correct: 'The rule requires review below 98 percent.
+
+      Batch j is at 96 percent, which is below 98.
+
+      No waiver was recorded.
+
+      So the batch requires a second review.'
+    wrong: 'The rule requires review below 98 percent.
+
+      Batch j is at 96 percent, which is above 98.
+
+      No waiver was recorded.
+
+      So the batch does not require a second review.'
+    off_task: 'Laboratory forms can be filed by date.
+
+      Purity values are often written as percentages.
+
+      This does not determine whether the rule applies.'
+  gold:
+    answer: 'YES'
+    faulty_step: 2
+    fault_type: comparison
+  metadata:
+    support_count: 3
+    source: template

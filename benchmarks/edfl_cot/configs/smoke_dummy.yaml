@@ -1,0 +1,10 @@
+backend: dummy
+model: dummy
+m_serializations: 4
+alpha: 0.05
+p_star: 0.95
+top_logprobs: 3
+seed: 0
+max_concurrency: 4
+use_cache: false
+
